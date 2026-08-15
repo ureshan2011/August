@@ -113,15 +113,24 @@
     font-size:12.5px;letter-spacing:.04em;color:var(--ink-faint);
     min-height:16px;text-align:center;padding:0 8px;
   }
+  /* The button's own box must NEVER move or resize: on touch, a tap target
+     that shifts between touchstart and touchend loses the click entirely.
+     So the button stays still and the inner svg does all the animating. */
   .bombbtn{
-    width:min(128px,32vw);aspect-ratio:1;border:0;background:none;padding:0;cursor:pointer;
-    filter:drop-shadow(0 12px 26px rgba(255,140,190,.34));
-    animation:hover 3s ease-in-out infinite;touch-action:manipulation;
+    width:min(128px,32vw);aspect-ratio:1;border:0;background:none;cursor:pointer;
+    padding:10px;                       /* a little extra thumb room */
+    touch-action:manipulation;
   }
-  .bombbtn svg{width:100%;height:100%;display:block}
+  .bombbtn svg{
+    width:100%;height:100%;display:block;
+    filter:drop-shadow(0 12px 26px rgba(255,140,190,.34));
+    animation:hover 3s ease-in-out infinite;
+    transform-origin:50% 50%;
+  }
   @keyframes hover{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-10px) rotate(3deg)}}
-  .bombbtn:active{transform:scale(.86);animation:none;transition:transform .08s}
-  .bombbtn.launch{animation:launch .42s cubic-bezier(.4,0,.7,1) forwards;pointer-events:none}
+  .bombbtn:active svg{transform:scale(.86);animation:none;transition:transform .08s}
+  .bombbtn.launch{pointer-events:none}
+  .bombbtn.launch svg{animation:launch .42s cubic-bezier(.4,0,.7,1) forwards}
   @keyframes launch{
     0%{transform:translateY(0) scale(1) rotate(0)}
     100%{transform:translateY(-42vh) scale(.3) rotate(340deg);opacity:0}
@@ -480,4 +489,294 @@ function splash(x, y, col){
 
     if (p.k === "b"){
       p.w += .09; p.x += p.vx + Math.sin(p.w) * .6; p.y += p.vy;
-      p.v
+      p.vy -= .05; p.vx *= .987;
+      cx.globalAlpha = l * .85; cx.fillStyle = p.c;
+      cx.beginPath(); cx.arc(p.x, p.y, p.r * l, 0, 6.284); cx.fill();
+    } else if (p.k === "c"){
+      p.x += p.vx; p.y += p.vy; p.vy += .17; p.vx *= .992; p.rot += p.vr;
+      cx.globalAlpha = l; cx.fillStyle = p.c;
+      cx.save(); cx.translate(p.x, p.y); cx.rotate(p.rot);
+      cx.fillRect(-p.w/2, -p.h/2, p.w, p.h * (.35 + Math.abs(Math.cos(p.rot)) * .65));
+      cx.restore();
+    } else if (p.k === "e"){
+      p.x += p.vx; p.y += p.vy; p.vy += .13; p.vx *= .992; p.rot += p.vr;
+      cx.globalAlpha = l;
+      cx.save(); cx.translate(p.x, p.y); cx.rotate(p.rot);
+      cx.font = p.size + "px serif"; cx.textAlign = "center"; cx.textBaseline = "middle";
+      cx.fillText(p.t, 0, 0);
+      cx.restore();
+    } else {
+      p.x += p.vx; p.y += p.vy; p.vy += .42;
+      cx.globalAlpha = l * .9; cx.fillStyle = p.c;
+      cx.beginPath(); cx.arc(p.x, p.y, p.r * l, 0, 6.284); cx.fill();
+    }
+  }
+  cx.globalAlpha = 1;
+  requestAnimationFrame(loop);
+})();
+
+/* ---------------- audio (synthesised, no files) ---------------- */
+let AC = null, master = null, musicGain = null, musicTimer = null, step = 0;
+
+function initAudio(){
+  if (AC) return;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return;
+  AC = new Ctx();
+  master = AC.createGain(); master.gain.value = .9; master.connect(AC.destination);
+  musicGain = AC.createGain(); musicGain.gain.value = .17; musicGain.connect(master);
+  startMusic();
+}
+
+function tone({freq, dur = .3, type = "sine", vol = .3, at = 0, dest, slide}){
+  if (!AC) return;
+  const t = AC.currentTime + at;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vol, t + .012);
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g); g.connect(dest || master);
+  o.start(t); o.stop(t + dur + .05);
+}
+
+function noiseBurst(dur = .5, vol = .22){
+  if (!AC) return;
+  const n = Math.floor(AC.sampleRate * dur);
+  const buf = AC.createBuffer(1, n, AC.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const src = AC.createBufferSource(); src.buffer = buf;
+  const bp = AC.createBiquadFilter(); bp.type = "bandpass";
+  bp.frequency.setValueAtTime(1100, AC.currentTime);
+  bp.frequency.exponentialRampToValueAtTime(4200, AC.currentTime + dur);
+  bp.Q.value = 1.1;
+  const g = AC.createGain(); g.gain.setValueAtTime(vol, AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(.0001, AC.currentTime + dur);
+  src.connect(bp); bp.connect(g); g.connect(master);
+  src.start();
+}
+
+const MEL = [0,4,7,11,12,11,7,4, 2,5,9,12,14,12,9,5, 0,4,7,11,12,14,16,14, 5,9,12,16,14,12,9,4];
+const BASS = [0,0,7,7, -3,-3,4,4];
+const semi = n => 261.63 * Math.pow(2, n / 12);
+
+function startMusic(){
+  if (!AC || musicTimer) return;
+  musicTimer = setInterval(() => {
+    if (muted || !AC) return;
+    const m = MEL[step % MEL.length];
+    tone({ freq: semi(m + 12), dur: .17, type: "triangle", vol: .3, dest: musicGain });
+    if (step % 4 === 0) tone({ freq: semi(BASS[(step/4) % BASS.length] - 12), dur: .34, type: "sine", vol: .42, dest: musicGain });
+    if (step % 8 === 4) tone({ freq: semi(m + 24), dur: .1, type: "square", vol: .07, dest: musicGain });
+    step++;
+  }, 187.5);
+}
+
+function dropSound(i){
+  if (!AC || muted) return;
+  tone({ freq: 420, slide: 90, dur: .26, type: "sine", vol: .45 });
+  setTimeout(() => noiseBurst(.75, .16), 130);
+  const base = [0,4,7,12,16,19][i % 6];
+  for (let k = 0; k < 4; k++)
+    tone({ freq: semi(base + 12 + k * 4), dur: .22, type: "triangle", vol: .16, at: .16 + k * .055 });
+}
+
+function squeakSound(){
+  if (!AC || muted) return;
+  tone({ freq: 900, slide: 1500, dur: .1, type: "square", vol: .16 });
+  tone({ freq: 1400, slide: 700, dur: .12, type: "square", vol: .14, at: .1 });
+}
+
+function dingSound(){
+  if (!AC || muted) return;
+  [0,7,12,19].forEach((n,i) => tone({ freq: semi(n+12), dur: .5, type:"triangle", vol:.2, at:i*.06 }));
+}
+
+function finaleSound(){
+  if (!AC || muted) return;
+  [0,4,7,12,16].forEach((n, i) => {
+    tone({ freq: semi(n), dur: 1.5, type: "triangle", vol: .3, at: i * .07 });
+    tone({ freq: semi(n + 12), dur: 1.3, type: "sine", vol: .18, at: i * .07 + .02 });
+  });
+  noiseBurst(1.1, .2);
+}
+
+$("mute").addEventListener("click", () => {
+  muted = !muted;
+  if (musicGain) musicGain.gain.value = muted ? 0 : .17;
+  if (master) master.gain.value = muted ? 0 : .9;
+  $("muteIcon").innerHTML = muted
+    ? '<path d="M4 9v6h4l5 4V5L8 9H4zm15.5 3 2.7-2.7-1.4-1.4L18 10.6l-2.8-2.7-1.4 1.4 2.7 2.7-2.7 2.8 1.4 1.4 2.8-2.7 2.8 2.7 1.4-1.4z"/>'
+    : '<path d="M4 9v6h4l5 4V5L8 9H4zm12.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 2.2v2.1c3 .9 5 3.5 5 6.7s-2 5.8-5 6.7v2.1c4-1 7-4.5 7-8.8s-3-7.8-7-8.8z"/>';
+});
+
+/* ---------------- elements ---------------- */
+const bombEl = $("bomb"), tubEl = $("tub"), lineEl = $("line"), washEl = $("wash"),
+      counterEl = $("counter"), flavourEl = $("flavour"), hintEl = $("hint"),
+      duckEl = $("duck"), toastEl = $("toast"), appEl = $("app");
+
+function say(t){
+  lineEl.textContent = t;
+  lineEl.classList.remove("pop"); void lineEl.offsetWidth; lineEl.classList.add("pop");
+}
+
+function toast(t){
+  toastEl.textContent = t;
+  toastEl.classList.remove("show"); void toastEl.offsetWidth; toastEl.classList.add("show");
+  dingSound();
+}
+
+function counterLabel(){
+  let l = "dropped";
+  for (const [n, txt] of COUNTER_LABELS) if (drops >= n) l = txt;
+  return l;
+}
+
+function refresh(){
+  const p = PALETTE[drops % PALETTE.length];
+  $("bc2").setAttribute("stop-color", p.a);
+  $("bc3").setAttribute("stop-color", p.b);
+  $("bc4").setAttribute("stop-color", PALETTE[(drops + 3) % PALETTE.length].a);
+  $("bc5").setAttribute("stop-color", PALETTE[(drops + 5) % PALETTE.length].b);
+  flavourEl.textContent = FLAVOURS[drops % FLAVOURS.length];
+  counterEl.innerHTML = drops ? `<b>${drops}</b> &nbsp;${counterLabel()}` : "";
+}
+
+/* ---------------- the drop ---------------- */
+function drop(){
+  if (busy || finished) return;
+  busy = true;
+  initAudio();
+  if (AC && AC.state === "suspended") AC.resume();
+
+  const p = PALETTE[drops % PALETTE.length];
+  hintEl.classList.add("gone");
+  bombEl.classList.add("launch");
+  if (navigator.vibrate) navigator.vibrate(12);
+  dropSound(drops);
+
+  const r = tubEl.getBoundingClientRect();
+  const hitX = r.left + r.width / 2;
+  const hitY = r.top + r.height * .46;
+
+  setTimeout(() => {
+    drops++;
+    const lvl = Math.min(drops / DROPS_TO_FINALE, 1);
+
+    // water rises + recolours
+    const rise = 110 - lvl * 98;
+    $("waterBody").setAttribute("transform", `translate(0,${rise})`);
+    $("waterTop").setAttribute("transform", `translate(0,${rise})`);
+    $("wc1").setAttribute("stop-color", p.w1);
+    $("wc2").setAttribute("stop-color", p.w2);
+
+    // the duck floats up with the water
+    duckEl.style.bottom = (16 + lvl * 34) + "%";
+
+    // burst
+    splash(hitX, hitY, p.a);
+    bubbles(hitX, hitY, [p.a, p.b, "#ffffff", "#ffd76e"], 90 + drops * 8);
+    confetti(hitX, hitY, 26 + drops * 5, 7 + drops * .5);
+    if (drops >= 3) emojiBurst(hitX, hitY, 3 + Math.floor(drops / 2), 6 + drops * .3);
+
+    tubEl.classList.add("shake");
+    setTimeout(() => tubEl.classList.remove("shake"), 500);
+
+    // whole screen starts tilting once it gets silly
+    if (drops >= 7 && !reduced){
+      const tilt = (Math.random() - .5) * (drops - 6) * .5;
+      appEl.style.transform = `rotate(${tilt}deg)`;
+    }
+
+    if (navigator.vibrate) navigator.vibrate([0, 18, 30, 12]);
+
+    washEl.style.background =
+      `radial-gradient(120% 90% at 50% 60%, ${p.a}44, ${p.b}22 55%, transparent 78%)`;
+    washEl.style.opacity = String(Math.min(.28 + drops * .05, .82));
+
+    say(LINES[(drops - 1) % LINES.length]);
+
+    if (drops === DUCK_AT){
+      duckEl.classList.add("here");
+      setTimeout(() => say(DUCK_LINE), 900);
+    }
+    if (ACHIEVEMENTS[drops]) setTimeout(() => toast(ACHIEVEMENTS[drops]), 500);
+
+    refresh();
+    bombEl.classList.remove("launch");
+    busy = false;
+
+    if (drops >= DROPS_TO_FINALE) setTimeout(finale, 800);
+  }, reduced ? 30 : 400);
+}
+/* Fire on pointerdown, not click: on touch, waiting for `click` means waiting
+   for touchend to hit-test the same element again, which is exactly what a
+   moving/scaling tap target breaks. pointerdown fires the instant you touch. */
+const HAS_POINTER = "onpointerdown" in window;
+function bindTap(el, fn){
+  if (HAS_POINTER) el.addEventListener("pointerdown", fn);
+  else el.addEventListener("click", fn);
+  el.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " "){ e.preventDefault(); fn(e); }
+  });
+}
+
+bindTap(bombEl, drop);
+
+/* ---------------- the duck ---------------- */
+let squeaks = 0, squeakTimer = null;
+bindTap(duckEl, e => {
+  e.stopPropagation();
+  if (!duckEl.classList.contains("here")) return;
+  squeakSound();
+  if (navigator.vibrate) navigator.vibrate(8);
+  duckEl.classList.remove("squeak"); void duckEl.offsetWidth; duckEl.classList.add("squeak");
+  clearTimeout(squeakTimer);
+  squeakTimer = setTimeout(() => duckEl.classList.remove("squeak"), 520); // hand back to bobbing
+  const r = duckEl.getBoundingClientRect();
+  emojiBurst(r.left + r.width/2, r.top + r.height/2, 4, 5);
+  say(DUCK_SQUEAKS[squeaks++ % DUCK_SQUEAKS.length]);
+});
+
+/* ---------------- finale ---------------- */
+function finale(){
+  finished = true;
+  appEl.style.transform = "none";
+  $("stats").innerHTML = FINALE_STATS
+    .map(([k, v]) => `<div class="stat"><span>${k}</span><b>${v()}</b></div>`).join("");
+  $("finaleSub").textContent = FINALE_SUB;
+  $("finale").classList.add("on");
+  finaleSound();
+  if (navigator.vibrate) navigator.vibrate([0, 40, 60, 40, 60, 80]);
+
+  let n = 0;
+  const cannon = setInterval(() => {
+    confetti(Math.random() * W, H * (.25 + Math.random() * .4), 40, 13);
+    confetti(Math.random() * W, -20, 26, 9);
+    emojiBurst(Math.random() * W, H * .5, 4, 9);
+    if (++n > 11) clearInterval(cannon);
+  }, 230);
+}
+
+$("again").addEventListener("click", () => {
+  finished = false; drops = 0; squeaks = 0;
+  $("finale").classList.remove("on");
+  washEl.style.opacity = "0";
+  appEl.style.transform = "none";
+  lineEl.classList.remove("pop"); lineEl.textContent = "";
+  $("waterBody").setAttribute("transform", "translate(0,110)");
+  $("waterTop").setAttribute("transform", "translate(0,110)");
+  $("wc1").setAttribute("stop-color", "#7fd7e8");
+  $("wc2").setAttribute("stop-color", "#6aa7d8");
+  duckEl.classList.remove("here", "squeak");
+  duckEl.style.bottom = "16%";
+  hintEl.classList.remove("gone");
+  refresh();
+});
+
+refresh();
+</script>
+</body>
+</html>
