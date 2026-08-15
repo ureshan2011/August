@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#120e2e">
+<title>For Sandalee</title>
+<style>
+  :root{
+    --bg-1:#1a1040;
+    --bg-2:#120e2e;
+    --ink:#fdf7ef;
+    --ink-soft:rgba(253,247,239,.75);
+    --ink-faint:rgba(253,247,239,.42);
+    --gold:#ffd76e;
+    --sans:ui-rounded,"SF Pro Rounded",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
+  body{
+    background:radial-gradient(130% 100% at 50% 0%,var(--bg-1) 0%,var(--bg-2) 70%);
+    color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    user-select:none;-webkit-user-select:none;touch-action:manipulation;
+  }
+
+  /* above the finale so the confetti cannon is never hidden behind it */
+  #fx{position:fixed;inset:0;z-index:7;pointer-events:none}
+  .wash{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:0;transition:opacity .9s ease,background 1.2s ease}
+
+  .app{
+    position:relative;z-index:2;
+    height:100svh;max-width:540px;margin:0 auto;
+    display:flex;flex-direction:column;
+    padding:max(14px,env(safe-area-inset-top)) 16px max(14px,env(safe-area-inset-bottom));
+    gap:8px;
+    transition:transform .5s cubic-bezier(.2,.9,.3,1);
+  }
+
+  /* ---------- header ---------- */
+  .top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex:0 0 auto}
+  .hed{font-size:clamp(15px,4.1vw,18px);line-height:1.4;font-weight:600;letter-spacing:-.01em;max-width:22ch}
+  .hed small{display:block;font-weight:400;color:var(--ink-faint);font-size:.82em;margin-top:3px}
+
+  .mute{
+    flex:0 0 auto;width:42px;height:42px;border-radius:50%;
+    border:1px solid rgba(253,247,239,.2);background:rgba(253,247,239,.07);
+    color:var(--ink-soft);display:grid;place-items:center;cursor:pointer;
+  }
+  .mute:active{transform:scale(.9)}
+  .mute svg{width:19px;height:19px;fill:currentColor}
+
+  /* ---------- punchline ---------- */
+  .line-slot{flex:0 0 auto;min-height:60px;display:grid;place-items:center;text-align:center;padding:8px 4px 0}
+  .line{
+    font-size:clamp(16px,4.6vw,20px);line-height:1.35;font-weight:700;
+    color:var(--gold);margin:0;opacity:0;text-wrap:balance;
+  }
+  .line.pop{animation:linePop .55s cubic-bezier(.2,1.6,.4,1) forwards}
+  @keyframes linePop{
+    0%{opacity:0;transform:scale(.6) rotate(-4deg) translateY(10px)}
+    60%{opacity:1;transform:scale(1.08) rotate(1deg)}
+    100%{opacity:1;transform:none}
+  }
+
+  /* ---------- tub ---------- */
+  .tubwrap{flex:1 1 auto;position:relative;display:grid;place-items:center;min-height:0}
+  .tub{position:relative;width:min(420px,94vw);max-height:100%;aspect-ratio:1/.86}
+  .tub > svg{width:100%;height:100%;display:block;overflow:visible}
+  .tub.shake{animation:shake .5s cubic-bezier(.36,.07,.19,.97)}
+  @keyframes shake{
+    0%,100%{transform:translate(0,0) rotate(0)}
+    15%{transform:translate(-7px,3px) rotate(-1.6deg)}
+    35%{transform:translate(7px,-3px) rotate(1.6deg)}
+    55%{transform:translate(-5px,2px) rotate(-1deg)}
+    78%{transform:translate(4px,-1px) rotate(.6deg)}
+  }
+  #waterTop,#waterBody{transition:transform .7s cubic-bezier(.2,.9,.3,1)}
+  #waterFill stop{transition:stop-color 1s ease}
+
+  /* rubber duck */
+  /* The button owns position + scale-in; the inner svg owns bob + squeak.
+     Keeping them on separate elements means the squeak animation can never
+     clobber the scale and make the duck disappear. */
+  .duck{
+    position:absolute;left:50%;width:19%;
+    transform:translate(-50%,0) scale(0);
+    transition:bottom .7s cubic-bezier(.2,.9,.3,1),
+               transform .6s cubic-bezier(.2,1.7,.4,1);
+    cursor:pointer;z-index:2;border:0;background:none;padding:0;
+  }
+  .duck.here{transform:translate(-50%,0) scale(1)}
+  .duck svg{
+    width:100%;height:auto;display:block;
+    filter:drop-shadow(0 4px 8px rgba(0,0,0,.3));
+    animation:bobbing 2.6s ease-in-out infinite;
+  }
+  @keyframes bobbing{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-7px) rotate(4deg)}}
+  .duck.squeak svg{animation:squeak .5s cubic-bezier(.2,1.8,.4,1)}
+  @keyframes squeak{0%{transform:translateY(0) scale(1)}35%{transform:translateY(-16px) scale(1.32) rotate(14deg)}100%{transform:translateY(0) scale(1)}}
+
+  .counter{
+    position:absolute;left:50%;bottom:-4px;transform:translateX(-50%);
+    font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);
+    white-space:nowrap;
+  }
+  .counter b{color:var(--gold);font-size:15px;letter-spacing:0}
+
+  /* ---------- tray ---------- */
+  .tray{flex:0 0 auto;display:grid;place-items:center;gap:8px;padding-top:2px}
+  .flavour{
+    font-size:12.5px;letter-spacing:.04em;color:var(--ink-faint);
+    min-height:16px;text-align:center;padding:0 8px;
+  }
+  .bombbtn{
+    width:min(128px,32vw);aspect-ratio:1;border:0;background:none;padding:0;cursor:pointer;
+    filter:drop-shadow(0 12px 26px rgba(255,140,190,.34));
+    animation:hover 3s ease-in-out infinite;touch-action:manipulation;
+  }
+  .bombbtn svg{width:100%;height:100%;display:block}
+  @keyframes hover{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-10px) rotate(3deg)}}
+  .bombbtn:active{transform:scale(.86);animation:none;transition:transform .08s}
+  .bombbtn.launch{animation:launch .42s cubic-bezier(.4,0,.7,1) forwards;pointer-events:none}
+  @keyframes launch{
+    0%{transform:translateY(0) scale(1) rotate(0)}
+    100%{transform:translateY(-42vh) scale(.3) rotate(340deg);opacity:0}
+  }
+  .hint{
+    font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-faint);
+    animation:pulse 2.4s ease-in-out infinite;height:15px;
+  }
+  @keyframes pulse{0%,100%{opacity:.35}50%{opacity:.95}}
+  .hint.gone{opacity:0;animation:none;transition:opacity .4s}
+
+  /* ---------- achievement toast ---------- */
+  .toast{
+    position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 66px);z-index:8;
+    transform:translate(-50%,-24px);opacity:0;pointer-events:none;
+    background:rgba(255,215,110,.94);color:#3a2410;
+    padding:9px 17px;border-radius:999px;font-size:13px;font-weight:800;
+    letter-spacing:.02em;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis;
+    box-shadow:0 8px 26px rgba(0,0,0,.4);
+  }
+  .toast.show{animation:toast 2.4s cubic-bezier(.2,1.5,.4,1) forwards}
+  @keyframes toast{
+    0%{opacity:0;transform:translate(-50%,-24px) scale(.7)}
+    12%{opacity:1;transform:translate(-50%,0) scale(1)}
+    80%{opacity:1;transform:translate(-50%,0) scale(1)}
+    100%{opacity:0;transform:translate(-50%,-14px) scale(.95)}
+  }
+
+  /* ---------- finale ---------- */
+  .finale{
+    position:fixed;inset:0;z-index:6;display:none;
+    place-items:center;text-align:center;padding:24px;
+    background:radial-gradient(120% 90% at 50% 45%,rgba(60,20,80,.74),rgba(12,8,32,.95));
+    backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
+  }
+  .finale.on{display:grid}
+
+  /* px-based, NOT ch — ch resolves on the parent font and froze this box */
+  .finale-in{width:100%;max-width:min(560px,90vw)}
+
+  .finale h1{
+    font-size:clamp(30px,8.2vw,54px);line-height:1.06;margin:0;font-weight:800;letter-spacing:-.02em;
+    padding:.06em .12em;                 /* keeps glyph overhang inside the background box */
+    overflow-wrap:break-word;text-wrap:balance;
+    background:linear-gradient(112deg,#ffe58a,#ff9ecb 45%,#8fe6ff);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    animation:bigpop .8s cubic-bezier(.2,1.6,.4,1) both;
+  }
+  @keyframes bigpop{0%{opacity:0;transform:scale(.5) rotate(-7deg)}100%{opacity:1;transform:none}}
+
+  .stats{
+    margin:22px auto 0;display:grid;gap:7px;max-width:330px;
+    animation:fadeUp .7s ease .5s both;
+  }
+  .stat{
+    display:flex;justify-content:space-between;gap:14px;align-items:baseline;
+    font-size:clamp(13px,3.6vw,15px);color:var(--ink-soft);
+    border-bottom:1px dashed rgba(253,247,239,.16);padding-bottom:6px;
+  }
+  .stat b{color:var(--gold);font-size:1.15em;font-weight:800}
+
+  .finale p{
+    margin:20px 0 0;font-size:clamp(14px,3.9vw,17px);line-height:1.55;color:var(--ink-soft);
+    text-wrap:balance;animation:fadeUp .7s ease .75s both;
+  }
+  @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+  .again{
+    margin-top:26px;padding:14px 28px;border-radius:999px;cursor:pointer;
+    border:1.5px solid rgba(253,247,239,.55);background:rgba(253,247,239,.18);color:var(--ink);
+    font-family:inherit;font-size:15px;font-weight:700;letter-spacing:.04em;
+    box-shadow:0 6px 22px rgba(0,0,0,.35);
+    animation:fadeUp .7s ease 1s both;
+  }
+  .again:active{transform:scale(.94)}
+
+  @media (max-height:670px){
+    .bombbtn{width:min(100px,26vw)}
+    .line-slot{min-height:48px;padding-top:4px}
+    .hed{font-size:14px}
+    .stats{margin-top:14px;gap:5px}
+    .finale p{margin-top:14px}
+    .again{margin-top:18px}
+  }
+
+  @media(prefers-reduced-motion:reduce){
+    *{animation-duration:.01ms !important;animation-iteration-count:1 !important}
+    .line{opacity:1}
+    .duck.here{transform:translate(-50%,0) scale(1)}
+  }
+</style>
+</head>
+<body>
+
+<div class="wash" id="wash"></div>
+<canvas id="fx"></canvas>
+<div class="toast" id="toast"></div>
+
+<div class="app" id="app">
+
+  <div class="top">
+    <div class="hed">
+      You said no bath bombs for your birthday.
+      <small>Technically, this isn't one.</small>
+    </div>
+    <button class="mute" id="mute" aria-label="Toggle sound">
+      <svg id="muteIcon" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4zm12.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 2.2v2.1c3 .9 5 3.5 5 6.7s-2 5.8-5 6.7v2.1c4-1 7-4.5 7-8.8s-3-7.8-7-8.8z"/></svg>
+    </button>
+  </div>
+
+  <div class="line-slot"><p class="line" id="line"></p></div>
+
+  <div class="tubwrap">
+    <div class="tub" id="tub">
+      <svg viewBox="0 0 400 344" aria-hidden="true">
+        <defs>
+          <linearGradient id="waterFill" x1="0" y1="0" x2="0" y2="1">
+            <stop id="wc1" offset="0%" stop-color="#7fd7e8"/>
+            <stop id="wc2" offset="100%" stop-color="#6aa7d8"/>
+          </linearGradient>
+          <linearGradient id="porcelain" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#fdf7ef"/><stop offset="100%" stop-color="#e2d8ea"/>
+          </linearGradient>
+          <clipPath id="tubClip">
+            <path d="M52 120 L348 120 L326 286 Q322 306 302 306 L98 306 Q78 306 74 286 Z"/>
+          </clipPath>
+        </defs>
+        <path d="M92 300 q-14 18 -4 30 l26 0 q8 -14 -2 -30 Z" fill="#c9bcd8"/>
+        <path d="M308 300 q14 18 4 30 l-26 0 q-8 -14 2 -30 Z" fill="#c9bcd8"/>
+        <path d="M52 120 L348 120 L326 286 Q322 306 302 306 L98 306 Q78 306 74 286 Z" fill="url(#porcelain)"/>
+        <g clip-path="url(#tubClip)">
+          <rect id="waterBody" x="40" y="150" width="320" height="300" fill="url(#waterFill)" transform="translate(0,110)"/>
+          <path id="waterTop" d="M20 150 q28 -13 56 0 t56 0 t56 0 t56 0 t56 0 t56 0 l0 40 l-336 0 Z"
+                fill="url(#waterFill)" transform="translate(0,110)"/>
+        </g>
+        <ellipse cx="200" cy="120" rx="148" ry="22" fill="none" stroke="#fdf7ef" stroke-width="7"/>
+        <ellipse cx="200" cy="120" rx="148" ry="22" fill="none" stroke="#c9bcd8" stroke-width="2.5" opacity=".5"/>
+        <g stroke="var(--gold)" stroke-width="8" fill="none" stroke-linecap="round">
+          <path d="M356 108 L356 74 q0 -12 -14 -12 l-16 0"/>
+        </g>
+        <circle cx="356" cy="112" r="7" fill="var(--gold)"/>
+        <path d="M96 150 q-8 70 6 128" stroke="rgba(255,255,255,.6)" stroke-width="7" fill="none" stroke-linecap="round" opacity=".55"/>
+      </svg>
+
+      <button class="duck" id="duck" style="bottom:16%" aria-label="Squeak">
+        <svg viewBox="0 0 100 84">
+          <ellipse cx="50" cy="62" rx="34" ry="19" fill="#ffd23f"/>
+          <path d="M20 58 q16 -12 34 -4 q16 7 28 -2 q-4 20 -30 21 q-26 1 -32 -15Z" fill="#f5b81c"/>
+          <circle cx="66" cy="34" r="19" fill="#ffd23f"/>
+          <path d="M83 33 l16 5 -16 6 q-4 -5 0 -11Z" fill="#ff8a3d"/>
+          <circle cx="71" cy="29" r="3.4" fill="#2b1f12"/>
+          <circle cx="72.4" cy="27.8" r="1.2" fill="#fff"/>
+        </svg>
+      </button>
+
+      <div class="counter" id="counter"></div>
+    </div>
+  </div>
+
+  <div class="tray">
+    <div class="flavour" id="flavour"></div>
+    <button class="bombbtn" id="bomb" aria-label="Drop a bath bomb">
+      <svg viewBox="0 0 120 120">
+        <defs>
+          <radialGradient id="bg1" cx="36%" cy="30%" r="72%">
+            <stop id="bc1" offset="0%" stop-color="#fff6fb"/>
+            <stop id="bc2" offset="45%" stop-color="#ffb3d8"/>
+            <stop id="bc3" offset="100%" stop-color="#e0679f"/>
+          </radialGradient>
+          <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+            <stop id="bc4" offset="0%" stop-color="#8fe6d8"/>
+            <stop id="bc5" offset="100%" stop-color="#b9a2e8"/>
+          </linearGradient>
+          <clipPath id="bclip"><circle cx="60" cy="60" r="50"/></clipPath>
+        </defs>
+        <circle cx="60" cy="60" r="50" fill="url(#bg1)"/>
+        <g clip-path="url(#bclip)" opacity=".9">
+          <path d="M-8 72 Q28 50 62 70 Q96 90 130 66 L130 126 L-8 126 Z" fill="url(#bg2)" opacity=".8"/>
+          <path d="M-8 92 Q26 74 60 92 Q94 110 130 88 L130 128 L-8 128 Z" fill="#ffd76e" opacity=".55"/>
+        </g>
+        <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="2"/>
+        <ellipse cx="42" cy="39" rx="14" ry="9.5" fill="rgba(255,255,255,.68)" transform="rotate(-28 42 39)"/>
+        <circle cx="87" cy="33" r="3" fill="#fff" opacity=".9"/>
+        <circle cx="95" cy="45" r="1.8" fill="#fff" opacity=".65"/>
+      </svg>
+    </button>
+    <div class="hint" id="hint">Tap to drop</div>
+  </div>
+</div>
+
+<div class="finale" id="finale">
+  <div class="finale-in">
+    <h1>Happy birthday, Sandalee</h1>
+    <div class="stats" id="stats"></div>
+    <p id="finaleSub"></p>
+    <button class="again" id="again">Do it again</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   WORDS — edit freely. Everything below this block is machinery.
+   ============================================================ */
+
+const LINES = [
+  "There it goes. No regrets.",
+  "Two. Nobody is stopping you.",
+  "Still no bathtub. Still working.",
+  "The jacuzzi remains under review.",
+  "Somewhere, Lush is getting nervous 🌝",
+  "This is technically a business plan.",
+  "Six. It's a lot. I'm not judging. Loudly.",
+  "Water is 60% glitter. Structurally concerning.",
+  "The neighbours downstairs have questions.",
+  "You said no bath bombs. I said nothing about ten.",
+  "Okay this is a cry for help 💀",
+  "The tub has filed a formal complaint."
+];
+
+const FLAVOURS = [
+  "Matcha — for the antioxidants, obviously",
+  "Dodol Deluxe",
+  "Kottu Chaos",
+  "Sunset, Obviously",
+  "Emotional Support Lavender",
+  "Passive Aggressive Peach",
+  "3AM Overthinking",
+  "Extra Glitter, No Regrets",
+  "Monday Repellent",
+  "Unhinged Bergamot",
+  "Certified Menace",
+  "Absolute Final Bath Bomb (lying)"
+];
+
+/* Pops up when you hit that number of drops. */
+const ACHIEVEMENTS = {
+  3:  "🏆 Casual Enthusiast",
+  5:  "🫧 Lush is watching",
+  7:  "🚨 Certified Menace",
+  9:  "💀 Beyond Help",
+  11: "👑 Bath Bomb Royalty"
+};
+
+/* Counter label changes as it climbs. */
+const COUNTER_LABELS = [
+  [0, "dropped"], [4, "dropped, casually"], [7, "dropped, allegedly"], [10, "dropped, no comment"]
+];
+
+const DUCK_AT = 4;
+const DUCK_LINE = "A duck has joined. He lives here now.";
+const DUCK_SQUEAKS = [
+  "He does not approve.",
+  "Squeak. That's all he does.",
+  "He's seen things.",
+  "Stop poking the duck 🙂‍↔️",
+  "The duck is not a stress ball."
+];
+
+const DROPS_TO_FINALE = 12;
+const FINALE_SUB = "You have officially out-bathed a person who owns a bathtub. Very proud 🌝";
+const FINALE_STATS = [
+  ["Bath bombs used", () => drops],
+  ["Bathtubs owned",  () => "0"],
+  ["Regrets",         () => "also 0"]
+];
+
+/* One colour set per flavour, SAME ORDER as FLAVOURS. */
+const PALETTE = [
+  { a:"#a8dd8f", b:"#5c9440", w1:"#b2e09c", w2:"#63a04a" },
+  { a:"#d9a679", b:"#8a5a34", w1:"#d3a67e", w2:"#8a613c" },
+  { a:"#ffc59e", b:"#e0764f", w1:"#ffc9a4", w2:"#d97a53" },
+  { a:"#ffb08a", b:"#e0623f", w1:"#ffbe9c", w2:"#dc6f4d" },
+  { a:"#c3b0f0", b:"#7d5fd0", w1:"#c9b8f2", w2:"#7a63c8" },
+  { a:"#ffc0a8", b:"#e07a5f", w1:"#ffc8b2", w2:"#d9805f" },
+  { a:"#9fb6ff", b:"#4f5fc8", w1:"#a8bcff", w2:"#5566cc" },
+  { a:"#ffe58a", b:"#e8b73c", w1:"#ffe8a0", w2:"#e0ad3e" },
+  { a:"#8fe6d8", b:"#3fae9e", w1:"#9aeade", w2:"#44b0a4" },
+  { a:"#d8e08a", b:"#9aa63c", w1:"#dde49a", w2:"#a3ad48" },
+  { a:"#ffa8c8", b:"#e0558f", w1:"#ffb2ce", w2:"#d95f96" },
+  { a:"#9fdcff", b:"#4b93d8", w1:"#a5dfff", w2:"#4f93d4" }
+];
+
+const EMOJI = ["🫧","✨","🌝","💀","🎉","🛁","🦆","💫"];
+
+/* ============================================================
+   Machinery
+   ============================================================ */
+
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = id => document.getElementById(id);
+let drops = 0, muted = false, busy = false, finished = false;
+
+/* ---------------- canvas ---------------- */
+const cv = $("fx"), cx = cv.getContext("2d");
+let W = 0, H = 0, DPR = 1;
+function resize(){
+  DPR = Math.min(devicePixelRatio || 1, 2.5);
+  W = innerWidth; H = innerHeight;
+  cv.width = W * DPR; cv.height = H * DPR;
+  cv.style.width = W + "px"; cv.style.height = H + "px";
+  cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+resize();
+addEventListener("resize", resize);
+addEventListener("orientationchange", () => setTimeout(resize, 250));
+
+const parts = [];
+const MAX_PARTS = 700;
+const add = p => { if (parts.length < MAX_PARTS) parts.push(p); };
+
+function bubbles(x, y, col, n){
+  for (let i = 0; i < n; i++){
+    const a = Math.random() * Math.PI * 2, s = Math.random() * 3.6 + .5;
+    add({ k:"b", x:x + (Math.random()-.5)*70, y:y + (Math.random()-.5)*26,
+      vx:Math.cos(a)*s*.75, vy:Math.sin(a)*s*.5 - (Math.random()*2.8+1),
+      r:Math.random()*6+2, c:col[(Math.random()*col.length)|0],
+      life:1, dec:Math.random()*.012+.006, w:Math.random()*6.3 });
+  }
+}
+
+const CONF = ["#ffd76e","#ff9ecb","#8fe6d8","#b9a2e8","#ffa8a8","#9fdcff","#fdf7ef"];
+function confetti(x, y, n, power){
+  for (let i = 0; i < n; i++){
+    const a = Math.random() * Math.PI * 2, s = Math.random() * power + power * .35;
+    add({ k:"c", x, y, vx:Math.cos(a)*s, vy:Math.sin(a)*s - power*.5,
+      w:Math.random()*8+5, h:Math.random()*5+3,
+      rot:Math.random()*6.3, vr:(Math.random()-.5)*.36,
+      c:CONF[(Math.random()*CONF.length)|0], life:1, dec:Math.random()*.006+.0035 });
+  }
+}
+
+function emojiBurst(x, y, n, power){
+  for (let i = 0; i < n; i++){
+    const a = Math.random() * Math.PI * 2, s = Math.random() * power + power * .3;
+    add({ k:"e", x, y, vx:Math.cos(a)*s, vy:Math.sin(a)*s - power*.6,
+      size:Math.random()*16+16, rot:(Math.random()-.5)*.8, vr:(Math.random()-.5)*.14,
+      t:EMOJI[(Math.random()*EMOJI.length)|0], life:1, dec:Math.random()*.006+.004 });
+  }
+}
+
+function splash(x, y, col){
+  for (let i = 0; i < 18; i++){
+    const a = -Math.PI/2 + (Math.random()-.5) * 2.1, s = Math.random()*7+3;
+    add({ k:"d", x, y, vx:Math.cos(a)*s, vy:Math.sin(a)*s,
+      r:Math.random()*4+2, c:col, life:1, dec:.016 });
+  }
+}
+
+(function loop(){
+  cx.clearRect(0, 0, W, H);
+  for (let i = parts.length - 1; i >= 0; i--){
+    const p = parts[i];
+    p.life -= p.dec;
+    if (p.life <= 0){ parts.splice(i, 1); continue; }
+    const l = Math.max(0, p.life);
+
+    if (p.k === "b"){
+      p.w += .09; p.x += p.vx + Math.sin(p.w) * .6; p.y += p.vy;
+      p.v
